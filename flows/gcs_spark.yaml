@@ -1,0 +1,37 @@
+id: gcs_spark_transform
+namespace: company.team
+
+tasks:
+  - id: working_directory
+    type: io.kestra.plugin.core.flow.WorkingDirectory
+    tasks:
+      - id: clone_repository
+        type: io.kestra.plugin.git.Clone
+        url: https://github.com/ltp-94/kestra
+        branch: main
+
+      - id: spark_job
+        type: io.kestra.plugin.spark.SparkCLI
+        # We move inputFiles here so it doesn't block the Git Clone
+        inputFiles:
+          gcp-key.json: "{{ kv('GCP_CREDS') }}"
+          
+        containerImage: apache/spark:4.0.1-java21-r
+        env:
+          SPARK_DRIVER_JAVA_OPTS: "-Djdk.security.allowNonCausingSubstitutions=true"
+          SPARK_EXECUTOR_JAVA_OPTS: "-Djdk.security.allowNonCausingSubstitutions=true"
+        taskRunner:
+          type: io.kestra.plugin.scripts.runner.docker.Docker
+          networkMode: kestra-spark-network
+          user: root
+        commands:
+          - >
+            spark-submit 
+            --master "local[*]" 
+            --packages com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.17 
+            --conf "spark.hadoop.fs.gs.impl=com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem" 
+            --conf "spark.hadoop.fs.AbstractFileSystem.gs.impl=com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS" 
+            --conf "spark.hadoop.google.cloud.auth.service.account.enable=true" 
+            --conf "spark.hadoop.google.cloud.auth.service.account.json.keyfile=gcp-key.json" 
+            --conf "spark.hadoop.fs.gs.auth.type=SERVICE_ACCOUNT_JSON_KEYFILE" 
+            gcs_spark.py
