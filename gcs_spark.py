@@ -32,9 +32,9 @@ df_top_10.show()
 
 # 5. Write to GCS
 print(f"--- Writing 10 rows to: {output_path} ---")
-df_top_10.repartition(1).write \
-    .mode("overwrite") \
-    .parquet(output_path)
+# df_top_10.repartition(1).write \
+#     .mode("overwrite") \
+#     .parquet(output_path)
 
 print("--- Write Successful ---")
 
