@@ -1,12 +1,13 @@
+import os  # <--- THIS WAS MISSING
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, year, month
-import os
 
-
+# 1. Determine which path to use for the credentials
+# If running in your permanent Docker container, it uses /opt/spark/conf/
+# If running in Kestra, it uses the current local directory
 key_path = "/opt/spark/conf/gcp-key.json" if os.path.exists("/opt/spark/conf/gcp-key.json") else "gcp-key.json"
-# 1. Start the session
-# NOTE: 'auth.type' must be 'SERVICE_ACCOUNT_JSON_KEYFILE'
-# NOTE: 'keyfile' must be the path INSIDE the container
+
+# 2. Start the session
 spark = SparkSession.builder \
     .appName("GCS Parquet Transform") \
     .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem") \
@@ -21,27 +22,28 @@ output_path = "gs://kestra-demo-latypov/yellow_taxi_top_10/"
 
 print(f"--- Processing: {input_path} ---")
 
-# 2. Read data
+# 3. Read data
 df = spark.read.parquet(input_path)
 
-# 3. Transformations
+# 4. Transformations
 df_transformed = df.filter(col("fare_amount") > 10) \
     .withColumn("pickup_year", year(col("tpep_pickup_datetime"))) \
     .withColumn("pickup_month", month(col("tpep_pickup_datetime")))
 
-# 4. Get the first 10 rows
-df_top_10 = df_transformed.limit(10)
-df_top_10.show()
 
-# 5. Write to GCS
+print(df_top_10.show())
+
 print(f"--- Writing 10 rows to: {output_path} ---")
-# df_top_10.repartition(1).write \
-#     .mode("overwrite") \
-#     .parquet(output_path)
+
 
 print("--- Write Successful ---")
 
 spark.stop()
+
+
+
+
+
 
 # from pyspark.sql import SparkSession
 # from pyspark.sql.functions import col, year, month
