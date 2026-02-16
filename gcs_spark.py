@@ -30,7 +30,7 @@ df_transformed = df.filter(col("fare_amount") > 10) \
     .withColumn("pickup_year", year(col("tpep_pickup_datetime"))) \
     .withColumn("pickup_month", month(col("tpep_pickup_datetime")))
 
-
+df_top_10 = df_transformed.limit(10)
 print(df_top_10.show())
 
 print(f"--- Writing 10 rows to: {output_path} ---")
