@@ -1,5 +1,8 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, year, month
+import os
+
+
 key_path = "/opt/spark/conf/gcp-key.json" if os.path.exists("/opt/spark/conf/gcp-key.json") else "gcp-key.json"
 # 1. Start the session
 # NOTE: 'auth.type' must be 'SERVICE_ACCOUNT_JSON_KEYFILE'
