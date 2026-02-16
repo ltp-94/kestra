@@ -35,6 +35,11 @@ print(df_top_10.show())
 
 print(f"--- Writing 10 rows to: {output_path} ---")
 
+df_top_10.repartition(1).write \
+    .mode("overwrite") \
+    .option("header", "true") \
+    .csv("/opt/spark/work-dir/yellow_taxi_top_10.csv")
+
 
 print("--- Write Successful ---")
 
