@@ -1,6 +1,6 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, year, month
-
+key_path = "/opt/spark/conf/gcp-key.json" if os.path.exists("/opt/spark/conf/gcp-key.json") else "gcp-key.json"
 # 1. Start the session
 # NOTE: 'auth.type' must be 'SERVICE_ACCOUNT_JSON_KEYFILE'
 # NOTE: 'keyfile' must be the path INSIDE the container
@@ -9,7 +9,7 @@ spark = SparkSession.builder \
     .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem") \
     .config("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS") \
     .config("spark.hadoop.google.cloud.auth.service.account.enable", "true") \
-    .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", "/opt/spark/conf/gcp-key.json") \
+    .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", key_path) \
     .config("spark.hadoop.fs.gs.auth.type", "SERVICE_ACCOUNT_JSON_KEYFILE") \
     .getOrCreate()
 
