@@ -35,7 +35,7 @@ print(df_top_10.show())
 
 print(f"--- Writing 10 rows to: {output_path} ---")
 
-output_name = "transformed_taxi_data"
+output_name = "yellow_taxi_top_10_output"
 
 # Save to the current working directory
 # Kestra will pick this up if you use outputFiles in the YAML
