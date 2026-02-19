@@ -40,14 +40,15 @@ print(f"--- Writing 10 rows to: {output_path} ---")
 # Save to the current working directory
 # Kestra will pick this up if you use outputFiles in the YAML
 # Use a simple relative path
-output_dir = "output_data"
+# Change this part in gcs_spark.py
+output_dir = "spark_output"  # Use a clean name
 
 df_top_10.repartition(1).write \
     .mode("overwrite") \
     .option("header", "true") \
     .csv(output_dir)
 
-print(f"Checking if directory exists: {os.path.exists(output_dir)}")
+print(f"--- Processed files saved to folder: {output_dir} ---"))
 
 
 spark.stop()
