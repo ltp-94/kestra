@@ -35,16 +35,19 @@ print(df_top_10.show())
 
 print(f"--- Writing 10 rows to: {output_path} ---")
 
-output_name = "yellow_taxi_top_10_output"
+#output_name = "yellow_taxi_top_10_output"
 
 # Save to the current working directory
 # Kestra will pick this up if you use outputFiles in the YAML
+# Use a simple relative path
+output_dir = "output_data"
+
 df_top_10.repartition(1).write \
     .mode("overwrite") \
     .option("header", "true") \
-    .csv(output_name)
+    .csv(output_dir)
 
-print(f"--- Write Successful to {os.getcwd()}/{output_name} ---")
+print(f"Checking if directory exists: {os.path.exists(output_dir)}")
 
 
 spark.stop()
