@@ -1,13 +1,11 @@
-import os  # <--- THIS WAS MISSING
+import os
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, year, month
 
-# 1. Determine which path to use for the credentials
-# If running in your permanent Docker container, it uses /opt/spark/conf/
-# If running in Kestra, it uses the current local directory
+# 1. Credentials path logic
 key_path = "/opt/spark/conf/gcp-key.json" if os.path.exists("/opt/spark/conf/gcp-key.json") else "gcp-key.json"
 
-# 2. Start the session
+# 2. Spark Session
 spark = SparkSession.builder \
     .appName("GCS Parquet Transform") \
     .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem") \
@@ -18,41 +16,28 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 input_path = "gs://kestra-demo-latypov/yellow_tripdata_2024-01.parquet"
-output_path = "gs://kestra-demo-latypov/yellow_taxi_top_10/"
 
 print(f"--- Processing: {input_path} ---")
 
-# 3. Read data
 df = spark.read.parquet(input_path)
 
-# 4. Transformations
 df_transformed = df.filter(col("fare_amount") > 10) \
     .withColumn("pickup_year", year(col("tpep_pickup_datetime"))) \
     .withColumn("pickup_month", month(col("tpep_pickup_datetime")))
 
 df_top_10 = df_transformed.limit(10)
-print(df_top_10.show())
 
-print(f"--- Writing 10 rows to: {output_path} ---")
-
-#output_name = "yellow_taxi_top_10_output"
-
-# Save to the current working directory
-# Kestra will pick this up if you use outputFiles in the YAML
-# Use a simple relative path
-# Change this part in gcs_spark.py
-output_dir = "spark_output"  # Use a clean name
+# 3. Output Logic
+output_dir = "spark_output" 
 
 df_top_10.repartition(1).write \
     .mode("overwrite") \
     .option("header", "true") \
     .csv(output_dir)
 
-print(f"--- Processed files saved to folder: {output_dir} ---"))
-
+print(f"--- Processed files saved to folder: {output_dir} ---")
 
 spark.stop()
-
 
 
 
