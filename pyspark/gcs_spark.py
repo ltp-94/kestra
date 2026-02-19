@@ -2,40 +2,61 @@ import os
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, year, month
 
-# 1. Credentials path logic
-key_path = "/opt/spark/conf/gcp-key.json" if os.path.exists("/opt/spark/conf/gcp-key.json") else "gcp-key.json"
+# --- 1. PATH LOGIC ---
+# Get absolute path of /pyspark folder
+current_script_dir = os.path.dirname(os.path.abspath(__file__))
+# Go up to project root
+project_root = os.path.dirname(current_script_dir)
 
-# 2. Spark Session
-spark = SparkSession.builder \
-    .appName("GCS Parquet Transform") \
-    .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem") \
-    .config("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS") \
-    .config("spark.hadoop.google.cloud.auth.service.account.enable", "true") \
-    .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", key_path) \
-    .config("spark.hadoop.fs.gs.auth.type", "SERVICE_ACCOUNT_JSON_KEYFILE") \
-    .getOrCreate()
+local_key_path = os.path.join(project_root, "service-account.json")
+docker_key_path = "/opt/spark/conf/gcp-key.json"
 
+if os.path.exists(docker_key_path):
+    key_path = docker_key_path
+    print(f"Environment: Docker - Using {key_path}")
+elif os.path.exists(local_key_path):
+    key_path = local_key_path
+    print(f"Environment: Local/Codespace - Using {key_path}")
+else:
+    raise FileNotFoundError(f"Could not find JSON key at {local_key_path} or {docker_key_path}")
+
+# --- 2. SPARK SESSION ---
+# Using parentheses () instead of backslashes \ to avoid indentation errors
+spark = (SparkSession.builder
+    .appName("GCS Parquet Transform")
+    .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
+    .config("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
+    # Authentication settings
+    .config("spark.hadoop.google.cloud.auth.service.account.enable", "true")
+    .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", key_path)
+    .config("spark.hadoop.fs.gs.auth.type", "SERVICE_ACCOUNT_JSON_KEYFILE")
+    .getOrCreate())
+
+# --- 3. PROCESSING ---
 input_path = "gs://kestra-demo-latypov/yellow_tripdata_2024-01.parquet"
+output_path = "yellow_taxi_output"
 
 print(f"--- Processing: {input_path} ---")
 
+# Read data
 df = spark.read.parquet(input_path)
 
+# Transformations
 df_transformed = df.filter(col("fare_amount") > 10) \
     .withColumn("pickup_year", year(col("tpep_pickup_datetime"))) \
     .withColumn("pickup_month", month(col("tpep_pickup_datetime")))
 
 df_top_10 = df_transformed.limit(10)
+df_top_10.show()
 
-# 3. Output Logic
-output_dir = "spark_output" 
+print(f"--- Writing 10 rows to local folder: {output_path} ---")
 
 df_top_10.repartition(1).write \
     .mode("overwrite") \
     .option("header", "true") \
-    .csv(output_dir)
+    .csv(output_path)
 
-print(f"--- Processed files saved to folder: {output_dir} ---")
+print("--- Job Successful ---")
 
 spark.stop()
 
