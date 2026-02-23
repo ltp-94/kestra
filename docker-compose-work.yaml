@@ -1,11 +1,10 @@
+#20.02.2026
 volumes:
   ny_taxi_postgres_data:
     driver: local
   kestra_postgres_data:
     driver: local
   kestra_data:
-    driver: local
-  spark-events:
     driver: local
 
 networks:
@@ -14,22 +13,62 @@ networks:
     driver: bridge
 
 services:
+  # spark-master:
+  #   image: apache/spark:4.0.1-java21-r
+  #   container_name: spark-master
+  #   command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master"]
+  #   ports:
+  #     - "38080:8080"   # Spark Master UI
+  #     - "37077:7077"   # Spark Master RPC
+  #   volumes:
+  #     - /workspaces/kestra/service-account.json:/opt/spark/conf/gcp-key.json:ro
+  #     - ./gcs_spark.py:/opt/spark/work-dir/gcs_spark.py
+  #     - ./gcs-connector-4.0.1-shaded.jar:/opt/spark/jars/gcs-connector-4.0.1-shaded.jar:ro
+  #   environment:
+  #     - GOOGLE_APPLICATION_CREDENTIALS=/opt/spark/conf/gcp-key.json   # harmless, but Hadoop confs in app are what matter
+  #   networks:
+  #     - kestra-spark-network
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8080"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 5
+
+  # spark-worker:
+  #   image: apache/spark:4.0.1-java21-r
+  #   container_name: spark-worker
+  #   depends_on:
+  #     - spark-master
+  #   command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077"]
+  #   environment:
+  #     - SPARK_WORKER_CORES=1
+  #     - SPARK_WORKER_MEMORY=1G
+  #     - GOOGLE_APPLICATION_CREDENTIALS=/opt/spark/conf/gcp-key.json
+  #   ports:
+  #     - "38081:8081"   # Worker UI
+  #   volumes:
+  #     - /workspaces/kestra/service-account.json:/opt/spark/conf/gcp-key.json:ro
+  #     - ./gcs-connector-4.0.1-shaded.jar:/opt/spark/jars/gcs-connector-4.0.1-shaded.jar:ro
+  #   networks:
+  #     - kestra-spark-network
+  #   restart: unless-stopped
   spark-master:
     image: apache/spark:4.0.1-java21-r
     container_name: spark-master
     command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master"]
     ports:
-      - "38080:8080"   # Spark Master UI
-      - "37077:7077"   # Spark Master RPC
+      - "38080:8080"
+      - "37077:7077"
     environment:
+      # These fix the "getSubject" error and Java 21 modularity issues
       - SPARK_MASTER_OPTS=--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/javax.security.auth=ALL-UNNAMED -Djdk.security.allowNonCausingSubstitutions=true
       - SPARK_DRIVER_JAVA_OPTS=-Djdk.security.allowNonCausingSubstitutions=true
-      - SPARK_EVENTLOG_ENABLED=true
-      - SPARK_EVENTLOG_DIR=/opt/spark/spark-events
     volumes:
+      # Use relative paths for better portability
       - ./service-account.json:/opt/spark/conf/gcp-key.json:ro
-      - ./pyspark:/opt/spark/work-dir
-      - spark-events:/opt/spark/spark-events
+      - ./pyspark/gcs_spark.py:/opt/spark/work-dir/gcs_spark.py
+      #- ./gcs-connector-4.0.1-shaded.jar:/opt/spark/jars/gcs-connector-4.0.1-shaded.jar:ro
     networks:
       - kestra-spark-network
     restart: unless-stopped
@@ -43,34 +82,19 @@ services:
     environment:
       - SPARK_WORKER_CORES=1
       - SPARK_WORKER_MEMORY=1G
+      # These flags ensure the worker can handle the Java 21 security requirements
       - SPARK_WORKER_OPTS=--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/javax.security.auth=ALL-UNNAMED -Djdk.security.allowNonCausingSubstitutions=true
       - SPARK_EXECUTOR_JAVA_OPTS=-Djdk.security.allowNonCausingSubstitutions=true
-      - SPARK_EVENTLOG_ENABLED=true
-      - SPARK_EVENTLOG_DIR=/opt/spark/spark-events
     volumes:
       - ./service-account.json:/opt/spark/conf/gcp-key.json:ro
-      - spark-events:/opt/spark/spark-events
+      #- ./gcs-connector-4.0.1-shaded.jar:/opt/spark/jars/gcs-connector-4.0.1-shaded.jar:ro
     networks:
       - kestra-spark-network
     restart: unless-stopped
 
-  spark-history:
-    image: apache/spark:4.0.1-java21-r
-    container_name: spark-history
-    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.history.HistoryServer"]
-    ports:
-      - "18080:18080"   # History Server UI
-    environment:
-      - SPARK_HISTORY_OPTS=-Dspark.history.fs.logDirectory=/opt/spark/spark-events
-    volumes:
-      - /workspaces/kestra/spark-events:/opt/spark/spark-events
-
-    networks:
-      - kestra-spark-network
-    restart: unless-stopped
-
+  # --- KESTRA INFRASTRUCTURE ---
   kestra_postgres:
-    image: postgres:16
+    image: postgres:18
     volumes:
       - kestra_postgres_data:/var/lib/postgresql
     environment:
@@ -120,3 +144,8 @@ services:
     depends_on:
       kestra_postgres:
         condition: service_started
+
+  # (Your other services like pgdatabase and pgadmin should also join 'kestra-spark-network')
+
+
+
