@@ -1,11 +1,18 @@
 import os
+import time
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, year, month
 
 # --- 1. Spark Session ---
-spark = (SparkSession.builder
-    .appName("Transform")
-    .getOrCreate())
+from pyspark.sql import SparkSession
+
+
+start = time.time()
+spark = (
+   SparkSession.builder \
+   .appName("GCS Test")\
+   .getOrCreate()
+)
 
 # --- 2. Paths ---
 input_path = "/workspaces/kestra/data/Books.csv"
@@ -14,7 +21,6 @@ output_path = "/workspaces/kestra/data/books_output"
 print(f"--- Processing: {input_path} ---")
 
 # --- 3. Read Data ---
-# Use header=True so Spark picks up column names
 df = spark.read.csv(input_path, header=True, inferSchema=True)
 
 # --- 4. Explore ---
@@ -34,6 +40,16 @@ df_renamed = (df
 
 df_renamed.show(5)
 
+# --- 5. Keep Spark UI alive ---
+#print("Sleeping for 120 seconds so you can view the Spark UI at http://localhost:4040")
+
+#time.sleep(120)
+end = time.time()
+print(f"Elapsed time: {end - start:.2f} seconds")
+# --- 6. Stop Spark ---
+spark.stop()
+
+
 
 # --- 5. Manipulations ---
 # Example: select only a few columns
@@ -48,4 +64,3 @@ df_renamed.show(5)
 # # --- 6. Save Results ---
 # recent_books.write.mode("overwrite").csv(output_path + "/recent_books", header=True)
 # author_counts.write.mode("overwrite").csv(output_path + "/author_counts", header=True)
-
