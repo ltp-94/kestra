@@ -1,0 +1,47 @@
+spark-submit --master "local[*]"\
+ --packages com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.17\
+ --conf "spark.hadoop.fs.gs.impl=com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem" \
+--conf "spark.hadoop.fs.AbstractFileSystem.gs.impl=com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS"\
+--conf "spark.hadoop.google.cloud.auth.service.account.enable=true"\
+--conf "spark.hadoop.google.cloud.auth.service.account.json.keyfile=gcp-key.json"\
+--conf "spark.hadoop.fs.gs.auth.type=SERVICE_ACCOUNT_JSON_KEYFILE"\
+gcs_spark.py
+
+docker exec -it spark-master /opt/spark/bin/spark-submit \
+  --master spark://spark-master:7077 \
+  /opt/spark/work-dir/gcs_spark.py
+
+
+spark-submit \
+--master "local[*]" \
+--packages com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.17 \
+gcs_spark.py
+
+
+==========================
+spark-submit \
+--master spark://spark-master:7077 \
+--packages com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.17 \
+gcs_spark.py
+********************
+spark-submit \
+--master spark://spark-master:7077 \
+--jars gcs-connector-4.0.1-shaded.jar \
+gcs_spark.py
+================================
+
+spark-submit \
+--master "local[*]" \
+--jars gcs-connector-4.0.1-shaded.jar \
+gcs_spark.py
+
+
+spark-submit \
+--master "local[*]" \
+gcs_spark.py
+
+
+
+spark-submit \
+ --master spark://spark-master:7077 \
+ spark_job.py
