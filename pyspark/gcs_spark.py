@@ -20,7 +20,7 @@ spark = (SparkSession.builder
 # --- 3. PROCESSING ---
 input_path = "gs://kestra-bucket-latypov/raw/Books.csv"
 # Save to 'spark_output' so Kestra captures it
-output_path = "/workspaces/kestra/data/books_output" 
+output_path = "gs://kestra-bucket-latypov/silver/books.csv" 
 
 print(f"--- Reading CSV: {input_path} ---")
 
