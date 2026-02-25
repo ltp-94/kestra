@@ -39,7 +39,7 @@ spark = (SparkSession.builder
     .getOrCreate())
 
 # --- 3. PROCESSING ---
-input_path = "gs://kestra-bucket-latypov/yellow_tripdata_2024-01.parquet"
+input_path = "gs://kestra-bucket-latypov/raw/Books.csv"
 output_path = "yellow_taxi_output"
 
 print(f"--- Processing: {input_path} ---")
