@@ -2,27 +2,31 @@ import os
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, year, month
 
-# --- 1. PATH LOGIC (Environment Detection) ---
-current_dir = os.getcwd()
-current_script_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(current_script_dir)
+# # --- 1. PATH LOGIC (Environment Detection) ---
+# current_dir = os.getcwd()
+# current_script_dir = os.path.dirname(os.path.abspath(__file__))
+# project_root = os.path.dirname(current_script_dir)
 
-# Define the three possible locations for the GCP Key
-kestra_key_path = os.path.join(current_dir, "gcp-key.json")
-docker_key_path = "/opt/spark/conf/gcp-key.json"
-local_key_path = os.path.join(project_root, "service-account.json")
+# # Define the three possible locations for the GCP Key
+# kestra_key_path = os.path.join(current_dir, "gcp-key.json")
+# docker_key_path = "/opt/spark/conf/gcp-key.json"
+# local_key_path = os.path.join(project_root, "service-account.json")
 
-if os.path.exists(kestra_key_path):
-    key_path = kestra_key_path
-    print(f"Environment: Kestra - Using {key_path}")
-elif os.path.exists(docker_key_path):
-    key_path = docker_key_path
-    print(f"Environment: Docker - Using {key_path}")
-elif os.path.exists(local_key_path):
-    key_path = local_key_path
-    print(f"Environment: Local/Codespace - Using {key_path}")
-else:
-    raise FileNotFoundError(f"Could not find JSON key at: \n1. {kestra_key_path}\n2. {docker_key_path}\n3. {local_key_path}")
+# if os.path.exists(kestra_key_path):
+#     key_path = kestra_key_path
+#     print(f"Environment: Kestra - Using {key_path}")
+# elif os.path.exists(docker_key_path):
+#     key_path = docker_key_path
+#     print(f"Environment: Docker - Using {key_path}")
+# elif os.path.exists(local_key_path):
+#     key_path = local_key_path
+#     print(f"Environment: Local/Codespace - Using {key_path}")
+# else:
+#     raise FileNotFoundError(f"Could not find JSON key at: \n1. {kestra_key_path}\n2. {docker_key_path}\n3. {local_key_path}")
+
+key_path = os.getenv("GCP_KEY_PATH", "service-account.json")
+print(f"--- Using GCP Key from: {key_path} ---")
+
 
 # --- 2. SPARK SESSION ---
 spark = (SparkSession.builder
