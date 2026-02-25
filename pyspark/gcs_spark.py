@@ -1,71 +1,33 @@
 import os
+import time  # <--- Added this
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, year, month
+from pyspark.sql.functions import col
 
-# # --- 1. PATH LOGIC (Environment Detection) ---
-# current_dir = os.getcwd()
-# current_script_dir = os.path.dirname(os.path.abspath(__file__))
-# project_root = os.path.dirname(current_script_dir)
-
-# # Define the three possible locations for the GCP Key
-# kestra_key_path = os.path.join(current_dir, "gcp-key.json")
-# docker_key_path = "/opt/spark/conf/gcp-key.json"
-# local_key_path = os.path.join(project_root, "service-account.json")
-
-# if os.path.exists(kestra_key_path):
-#     key_path = kestra_key_path
-#     print(f"Environment: Kestra - Using {key_path}")
-# elif os.path.exists(docker_key_path):
-#     key_path = docker_key_path
-#     print(f"Environment: Docker - Using {key_path}")
-# elif os.path.exists(local_key_path):
-#     key_path = local_key_path
-#     print(f"Environment: Local/Codespace - Using {key_path}")
-# else:
-#     raise FileNotFoundError(f"Could not find JSON key at: \n1. {kestra_key_path}\n2. {docker_key_path}\n3. {local_key_path}")
-
-key_path = os.getenv("GCP_KEY_PATH", "service-account.json")
+# --- 1. PATH LOGIC ---
+start = time.time()
+# Kestra passes the path to the key via this env var
+key_path = os.getenv("GCP_KEY_PATH", "gcp-key.json")
 print(f"--- Using GCP Key from: {key_path} ---")
-
 
 # --- 2. SPARK SESSION ---
 spark = (SparkSession.builder
-    .appName("GCS Parquet Transform")
+    .appName("GCS CSV Transform")
     .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
-    .config("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
     .config("spark.hadoop.google.cloud.auth.service.account.enable", "true")
     .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", key_path)
-    .config("spark.hadoop.fs.gs.auth.type", "SERVICE_ACCOUNT_JSON_KEYFILE")
     .getOrCreate())
 
 # --- 3. PROCESSING ---
 input_path = "gs://kestra-bucket-latypov/raw/Books.csv"
-output_path = "yellow_taxi_output"
+# Save to 'spark_output' so Kestra captures it
+output_path = "spark_output/processed_books" 
 
-start = time.time()
-spark = (
-   SparkSession.builder \
-   .appName("GCS Test")\
-   .getOrCreate()
-)
+print(f"--- Reading CSV: {input_path} ---")
 
-# --- 2. Paths ---
-input_path = "/workspaces/kestra/data/Books.csv"
-output_path = "/workspaces/kestra/data/books_output"
-
-print(f"--- Processing: {input_path} ---")
-
-# --- 3. Read Data ---
+# --- 4. Read Data (Crucial fix: .csv instead of .parquet) ---
 df = spark.read.csv(input_path, header=True, inferSchema=True)
 
-# --- 4. Explore ---
-print("Schema:")
-df.printSchema()
-
-print("Sample rows:")
-df.show(5)
-
-# Rename individual columns
+# --- 5. Transform ---
 df_renamed = (df
     .withColumnRenamed("Book-Title", "title")
     .withColumnRenamed("Book-Author", "author")
@@ -73,19 +35,16 @@ df_renamed = (df
     .withColumnRenamed("Publisher", "publisher")
 )
 
+# Optional: Write the result back to GCS or locally
+print(f"--- Saving result to: {output_path} ---")
+df_renamed.write.mode("overwrite").csv(output_path)
+
 df_renamed.show(5)
 
-# --- 5. Keep Spark UI alive ---
-#print("Sleeping for 120 seconds so you can view the Spark UI at http://localhost:4040")
-
-#time.sleep(120)
 end = time.time()
 print(f"Elapsed time: {end - start:.2f} seconds")
-# --- 6. Stop Spark ---
-
 print("--- Job Successful ---")
 
-# Stop the session
 spark.stop()
 
 
