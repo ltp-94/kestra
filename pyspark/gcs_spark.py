@@ -2,21 +2,16 @@ import os
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, year, month
 
-import os
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, year, month
-
 # --- 1. PATH LOGIC (Environment Detection) ---
 current_dir = os.getcwd()
 current_script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_script_dir)
 
-# Define the three possible locations
+# Define the three possible locations for the GCP Key
 kestra_key_path = os.path.join(current_dir, "gcp-key.json")
 docker_key_path = "/opt/spark/conf/gcp-key.json"
 local_key_path = os.path.join(project_root, "service-account.json")
 
-# THE FIX: Check all three paths in the if/elif block
 if os.path.exists(kestra_key_path):
     key_path = kestra_key_path
     print(f"Environment: Kestra - Using {key_path}")
@@ -30,25 +25,22 @@ else:
     raise FileNotFoundError(f"Could not find JSON key at: \n1. {kestra_key_path}\n2. {docker_key_path}\n3. {local_key_path}")
 
 # --- 2. SPARK SESSION ---
-# Using parentheses () instead of backslashes \ to avoid indentation errors
 spark = (SparkSession.builder
     .appName("GCS Parquet Transform")
     .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
     .config("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
-    # Authentication settings
     .config("spark.hadoop.google.cloud.auth.service.account.enable", "true")
     .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", key_path)
     .config("spark.hadoop.fs.gs.auth.type", "SERVICE_ACCOUNT_JSON_KEYFILE")
     .getOrCreate())
 
 # --- 3. PROCESSING ---
-#input_path = "gs://kestra-demo-latypov/yellow_tripdata_2024-01.parquet"
 input_path = "gs://kestra-bucket-latypov/yellow_tripdata_2024-01.parquet"
 output_path = "yellow_taxi_output"
 
 print(f"--- Processing: {input_path} ---")
 
-# Read data
+# Read data from GCS
 df = spark.read.parquet(input_path)
 
 # Transformations
@@ -56,11 +48,13 @@ df_transformed = df.filter(col("fare_amount") > 10) \
     .withColumn("pickup_year", year(col("tpep_pickup_datetime"))) \
     .withColumn("pickup_month", month(col("tpep_pickup_datetime")))
 
+# Get sample for validation
 df_top_10 = df_transformed.limit(10)
 df_top_10.show()
 
 print(f"--- Writing 10 rows to local folder: {output_path} ---")
 
+# Write output (Kestra will pick this up via outputFiles)
 df_top_10.repartition(1).write \
     .mode("overwrite") \
     .option("header", "true") \
@@ -68,6 +62,7 @@ df_top_10.repartition(1).write \
 
 print("--- Job Successful ---")
 
+# Stop the session
 spark.stop()
 
 
