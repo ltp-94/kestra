@@ -45,7 +45,7 @@ output_path = "yellow_taxi_output"
 print(f"--- Processing: {input_path} ---")
 
 # Read data from GCS
-df = spark.read.parquet(input_path)
+df = spark.read.option("header", True).csv(input_path)
 
 # Transformations
 df_transformed = df.filter(col("fare_amount") > 10) \
