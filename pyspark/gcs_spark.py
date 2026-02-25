@@ -42,27 +42,46 @@ spark = (SparkSession.builder
 input_path = "gs://kestra-bucket-latypov/raw/Books.csv"
 output_path = "yellow_taxi_output"
 
+start = time.time()
+spark = (
+   SparkSession.builder \
+   .appName("GCS Test")\
+   .getOrCreate()
+)
+
+# --- 2. Paths ---
+input_path = "/workspaces/kestra/data/Books.csv"
+output_path = "/workspaces/kestra/data/books_output"
+
 print(f"--- Processing: {input_path} ---")
 
-# Read data from GCS
-df = spark.read.option("header", True).csv(input_path)
+# --- 3. Read Data ---
+df = spark.read.csv(input_path, header=True, inferSchema=True)
 
-# Transformations
-df_transformed = df.filter(col("fare_amount") > 10) \
-    .withColumn("pickup_year", year(col("tpep_pickup_datetime"))) \
-    .withColumn("pickup_month", month(col("tpep_pickup_datetime")))
+# --- 4. Explore ---
+print("Schema:")
+df.printSchema()
 
-# Get sample for validation
-df_top_10 = df_transformed.limit(10)
-df_top_10.show()
+print("Sample rows:")
+df.show(5)
 
-print(f"--- Writing 10 rows to local folder: {output_path} ---")
+# Rename individual columns
+df_renamed = (df
+    .withColumnRenamed("Book-Title", "title")
+    .withColumnRenamed("Book-Author", "author")
+    .withColumnRenamed("Year-Of-Publication", "year")
+    .withColumnRenamed("Publisher", "publisher")
+)
 
-# Write output (Kestra will pick this up via outputFiles)
-df_top_10.repartition(1).write \
-    .mode("overwrite") \
-    .option("header", "true") \
-    .csv(output_path)
+df_renamed.show(5)
+
+# --- 5. Keep Spark UI alive ---
+#print("Sleeping for 120 seconds so you can view the Spark UI at http://localhost:4040")
+
+#time.sleep(120)
+end = time.time()
+print(f"Elapsed time: {end - start:.2f} seconds")
+# --- 6. Stop Spark ---
 
 print("--- Job Successful ---")
 
