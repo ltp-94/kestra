@@ -1,4 +1,3 @@
-#20.02.2026
 volumes:
   ny_taxi_postgres_data:
     driver: local
@@ -6,6 +5,10 @@ volumes:
     driver: local
   kestra_data:
     driver: local
+  # New volumes for Spark logs
+  spark_master_logs:
+  spark_worker_logs:
+  spark_event_logs:
 
 networks:
   kestra-spark-network:
@@ -16,19 +19,22 @@ services:
   spark-master:
     image: apache/spark:4.0.1-java21-r
     container_name: spark-master
+    user: root
     command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master"]
     ports:
-      - "38080:8080"   # Spark Master UI
-      - "37077:7077"   # Spark Master RPC
+      - "38080:8080"
+      - "37077:7077"
     environment:
       - SPARK_MASTER_OPTS=--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/javax.security.auth=ALL-UNNAMED -Djdk.security.allowNonCausingSubstitutions=true
       - SPARK_DRIVER_JAVA_OPTS=-Djdk.security.allowNonCausingSubstitutions=true
+      # Enable Event Logging (for History Server)
+      - SPARK_HISTORY_OPTS=-Dspark.history.fs.logDirectory=/opt/spark/event-logs
     volumes:
       - ./service-account.json:/opt/spark/conf/gcp-key.json:ro
-      - ./pyspark/gcs_spark.py:/opt/spark/work-dir/gcs_spark.py
       - ./pyspark/spark_job.py:/opt/spark/work-dir/spark_job.py
-      - ./data:/workspaces/kestra/data        # <-- mount data folder
-      - ./gcs-connector-4.0.1-shaded.jar:/opt/spark/jars/gcs-connector-4.0.1-shaded.jar:ro
+      - ./data:/opt/spark/work-dir/data 
+      - spark_master_logs:/opt/spark/logs          # Persist System Logs
+      - spark_event_logs:/opt/spark/event-logs      # Persist App History Logs
     networks:
       - kestra-spark-network
     restart: unless-stopped
@@ -36,6 +42,7 @@ services:
   spark-worker:
     image: apache/spark:4.0.1-java21-r
     container_name: spark-worker
+    user: root
     depends_on:
       - spark-master
     command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077"]
@@ -46,16 +53,31 @@ services:
       - SPARK_EXECUTOR_JAVA_OPTS=-Djdk.security.allowNonCausingSubstitutions=true
     volumes:
       - ./service-account.json:/opt/spark/conf/gcp-key.json:ro
-      - ./data:/workspaces/kestra/data        # <-- mount data folder here too
-      - ./gcs-connector-4.0.1-shaded.jar:/opt/spark/jars/gcs-connector-4.0.1-shaded.jar:ro
+      - ./data:/opt/spark/work-dir/data 
+      - spark_worker_logs:/opt/spark/logs          # Persist Worker System Logs
+      - spark_event_logs:/opt/spark/event-logs      # Share Event log dir
     networks:
       - kestra-spark-network
     restart: unless-stopped
 
+  # OPTIONAL: Spark History Server to view logs after jobs finish
+  spark-history-server:
+    image: apache/spark:4.0.1-java21-r
+    container_name: spark-history-server
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.history.HistoryServer"]
+    ports:
+      - "18080:18080"
+    environment:
+      - SPARK_HISTORY_OPTS=-Dspark.history.fs.logDirectory=/opt/spark/event-logs
+    volumes:
+      - spark_event_logs:/opt/spark/event-logs
+    networks:
+      - kestra-spark-network
+
   kestra_postgres:
     image: postgres:18
     volumes:
-      - kestra_postgres_data:/var/lib/postgresql
+      - kestra_postgres_data:/var/lib/postgresql/data # LOGS ARE SAVED HERE
     environment:
       POSTGRES_DB: kestra
       POSTGRES_USER: kestra
@@ -72,6 +94,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/kestra-wd:/tmp/kestra-wd
       - ~/.gcp/workflow-orchestration-credentials.json:/.gcp/credentials.json
+    # ... rest of your config ...
     env_file: .env_encoded
     environment:
       KESTRA_CONFIGURATION: |
@@ -103,3 +126,5 @@ services:
     depends_on:
       kestra_postgres:
         condition: service_started
+
+  # (Your other services like pgdatabase and pgadmin should also join 'kestra-spark-network')

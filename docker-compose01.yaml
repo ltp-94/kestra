@@ -1,10 +1,11 @@
-#20.02.2026
 volumes:
   ny_taxi_postgres_data:
     driver: local
   kestra_postgres_data:
     driver: local
   kestra_data:
+    driver: local
+  spark-events:
     driver: local
 
 networks:
@@ -23,12 +24,12 @@ services:
     environment:
       - SPARK_MASTER_OPTS=--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/javax.security.auth=ALL-UNNAMED -Djdk.security.allowNonCausingSubstitutions=true
       - SPARK_DRIVER_JAVA_OPTS=-Djdk.security.allowNonCausingSubstitutions=true
+      - SPARK_EVENTLOG_ENABLED=true
+      - SPARK_EVENTLOG_DIR=/opt/spark/spark-events
     volumes:
       - ./service-account.json:/opt/spark/conf/gcp-key.json:ro
-      - ./pyspark/gcs_spark.py:/opt/spark/work-dir/gcs_spark.py
-      - ./pyspark/spark_job.py:/opt/spark/work-dir/spark_job.py
-      - ./data:/workspaces/kestra/data        # <-- mount data folder
-      - ./gcs-connector-4.0.1-shaded.jar:/opt/spark/jars/gcs-connector-4.0.1-shaded.jar:ro
+      - ./pyspark:/opt/spark/work-dir
+      - spark-events:/opt/spark/spark-events
     networks:
       - kestra-spark-network
     restart: unless-stopped
@@ -44,16 +45,32 @@ services:
       - SPARK_WORKER_MEMORY=1G
       - SPARK_WORKER_OPTS=--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/javax.security.auth=ALL-UNNAMED -Djdk.security.allowNonCausingSubstitutions=true
       - SPARK_EXECUTOR_JAVA_OPTS=-Djdk.security.allowNonCausingSubstitutions=true
+      - SPARK_EVENTLOG_ENABLED=true
+      - SPARK_EVENTLOG_DIR=/opt/spark/spark-events
     volumes:
       - ./service-account.json:/opt/spark/conf/gcp-key.json:ro
-      - ./data:/workspaces/kestra/data        # <-- mount data folder here too
-      - ./gcs-connector-4.0.1-shaded.jar:/opt/spark/jars/gcs-connector-4.0.1-shaded.jar:ro
+      - spark-events:/opt/spark/spark-events
+    networks:
+      - kestra-spark-network
+    restart: unless-stopped
+
+  spark-history:
+    image: apache/spark:4.0.1-java21-r
+    container_name: spark-history
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.history.HistoryServer"]
+    ports:
+      - "18080:18080"   # History Server UI
+    environment:
+      - SPARK_HISTORY_OPTS=-Dspark.history.fs.logDirectory=/opt/spark/spark-events
+    volumes:
+      - /workspaces/kestra/spark-events:/opt/spark/spark-events
+
     networks:
       - kestra-spark-network
     restart: unless-stopped
 
   kestra_postgres:
-    image: postgres:18
+    image: postgres:16
     volumes:
       - kestra_postgres_data:/var/lib/postgresql
     environment:
