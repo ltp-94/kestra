@@ -1,29 +1,24 @@
 import os
-import time  # <--- Added this
+import time
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col
+#from pyspark.sql.functions import col, year, month
+from pyspark.sql import functions as F
 
-# --- 1. PATH LOGIC ---
+
 start = time.time()
-# Kestra passes the path to the key via this env var
-key_path = os.getenv("GCP_KEY_PATH", "gcp-key.json")
-print(f"--- Using GCP Key from: {key_path} ---")
+spark = (
+   SparkSession.builder \
+   .appName("GCS Test")\
+   .getOrCreate()
+)
 
-# --- 2. SPARK SESSION ---
-spark = (SparkSession.builder
-    .appName("GCS CSV Transform")
-    .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
-    .config("spark.hadoop.google.cloud.auth.service.account.enable", "true")
-    .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", key_path)
-    .getOrCreate())
+# --- 2. Paths ---
+input_path = "/workspaces/kestra/data/Books.csv"
+output_path = "/workspaces/kestra/data/books_output"
 
-# --- 3. PROCESSING ---
-input_path = "gs://kestra-bucket-latypov/raw/Books.csv"
-# Save to 'spark_output' so Kestra captures it
-output_path = "gs://kestra-bucket-latypov/silver/books.csv" 
+print(f"--- Processing: {input_path} ---")
 
-print(f"--- Reading CSV: {input_path} ---")
-
+# --- 3. Read Data ---
 df = (
     spark.read
          .option("header", True)
@@ -166,39 +161,16 @@ spark.stop()
 
 
 
+# --- 5. Manipulations ---
+# Example: select only a few columns
+# books = df.select("Book-Title", "Book-Author", "Year-Of-Publication")
 
+# # Filter: books published after 2000
+# recent_books = books.filter(col("Year-Of-Publication") > 2000)
 
+# # Group: count books per author
+# author_counts = books.groupBy("Book-Author").count().orderBy(col("count").desc())
 
-# from pyspark.sql import SparkSession
-# from pyspark.sql.functions import col, year, month
-
-# # Start the session
-# spark = SparkSession.builder.appName("GCS Parquet Transform").getOrCreate()
-
-# input_path = "gs://kestra-demo-latypov/yellow_tripdata_2024-01.parquet"
-# output_path = "gs://kestra-demo-latypov/yellow_taxi_top_10/"
-
-# print(f"--- Processing: {input_path} ---")
-
-# # 1. Read data
-# df = spark.read.parquet(input_path)
-
-# # 2. Transformations
-# df_transformed = df.filter(col("fare_amount") > 10) \
-#     .withColumn("pickup_year", year(col("tpep_pickup_datetime"))) \
-#     .withColumn("pickup_month", month(col("tpep_pickup_datetime")))
-
-# # 3. GET THE FIRST 10 ROWS ONLY
-# df_top_10 = df_transformed.limit(10)
-# print(df_top_10.show())
-# # 4. Write to GCS
-# # repartition(1) makes sure we get only 1 file in the folder
-# print(f"--- Writing 10 rows to: {output_path} ---")
-
-# df_top_10.repartition(1).write \
-#     .mode("overwrite") \
-#     .parquet(output_path)
-
-# print("--- Write Successful ---")
-
-spark.stop()
+# # --- 6. Save Results ---
+# recent_books.write.mode("overwrite").csv(output_path + "/recent_books", header=True)
+# author_counts.write.mode("overwrite").csv(output_path + "/author_counts", header=True)
