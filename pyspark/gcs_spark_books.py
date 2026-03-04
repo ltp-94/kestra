@@ -151,7 +151,12 @@ df = df.withColumn("year", F.col("year").cast("int"))
 
 df.printSchema()
 
-df.write.mode("overwrite").csv(output_path, header=True)
+df.write.mode("overwrite") \
+    .option("header", "true") \
+    .option("quote", '"') \
+    .option("quoteAll", "true") \
+    .option("escape", '"') \
+    .csv(output_path)
 
 
 
