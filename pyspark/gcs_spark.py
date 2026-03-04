@@ -1,7 +1,7 @@
 import os
 import time  # <--- Added this
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col
+from pyspark.sql import functions as F
 
 # --- 1. PATH LOGIC ---
 start = time.time()
@@ -17,10 +17,11 @@ spark = (SparkSession.builder
     .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", key_path)
     .getOrCreate())
 
+
 # --- 3. PROCESSING ---
 input_path = "gs://kestra-bucket-latypov/raw/Books.csv"
 # Save to 'spark_output' so Kestra captures it
-output_path = "gs://kestra-bucket-latypov/silver/books.csv" 
+output_path = "gs://kestra-bucket-latypov/transformed" 
 
 print(f"--- Reading CSV: {input_path} ---")
 
