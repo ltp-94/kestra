@@ -21,7 +21,7 @@ spark = (SparkSession.builder
 # --- 3. PROCESSING ---
 input_path = "gs://kestra-bucket-latypov/raw/Users.csv"
 # Save to 'spark_output' so Kestra captures it
-output_path = "gs://kestra-bucket-latypov/transformed" 
+output_path = "gs://kestra-bucket-latypov/transformed_users" 
 
 
 df = (
@@ -116,5 +116,5 @@ df.write.mode("overwrite") \
     .option("escape", '"') \
     .csv(output_path)
 
-    
+
 spark.stop()
