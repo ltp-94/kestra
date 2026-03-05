@@ -28,6 +28,7 @@ services:
     volumes:
       - ./service-account.json:/opt/spark/conf/gcp-key.json:ro
       - ./pyspark/gcs_spark_books.py:/opt/spark/work-dir/gcs_spark_books.py
+      - ./pyspark/gcs_spark_users.py:/opt/spark/work-dir/gcs_spark_users.py
 
       - ./pyspark/spark_books.py:/opt/spark/work-dir/spark_books.py
       - ./pyspark/spark_users.py:/opt/spark/work-dir/spark_users.py
