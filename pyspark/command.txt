@@ -7,6 +7,12 @@ spark-submit --master "local[*]"\
 --conf "spark.hadoop.fs.gs.auth.type=SERVICE_ACCOUNT_JSON_KEYFILE"\
 gcs_spark.py
 
+java -version
+readlink -f $(which java)
+export GOOGLE_APPLICATION_CREDENTIALS="/workspaces/kestra/service-account.json"
+
+sudo chmod -R 777 /workspaces/kestra/data/books_output
+
 docker exec -it spark-master /opt/spark/bin/spark-submit \
   --master spark://spark-master:7077 \
   /opt/spark/work-dir/gcs_spark.py
@@ -40,8 +46,3 @@ spark-submit \
 --master "local[*]" \
 gcs_spark.py
 
-
-
-spark-submit \
- --master spark://spark-master:7077 \
- spark_job.py
